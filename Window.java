@@ -3,7 +3,6 @@ import javafx.stage.Stage;
 import javafx.scene.*;
 import javafx.scene.paint.Color;
 import javafx.scene.canvas.*;
-import javafx.animation.AnimationTimer;
 import javafx.event.EventHandler;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.KeyCode;
@@ -24,6 +23,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Arrays;
+import java.util.Scanner;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.ByteArrayOutputStream;
 
 public class Window extends Application
 {
@@ -34,6 +37,10 @@ public class Window extends Application
     private int startX = 7, startY = 3;
     private String fileDirectory;
     private ArrayList<File> files = new ArrayList<File>();
+    private String filename;
+    private File currentFile;
+    private Terminal tem;
+    private String scanBuffer;
 
     public static void main(String []args)
     {
@@ -120,42 +127,27 @@ public class Window extends Application
                     }
                     if(!writingMode && e.getCode() == KeyCode.S)
                     {
-                        FileChooser fileChooser = new FileChooser();
-                        fileChooser.setTitle("Save");
-                        fileChooser.getExtensionFilters().addAll(new ExtensionFilter("Java", "*.java"));
-                        files.add(fileChooser.showSaveDialog(stage));
-                        //String[] temp = files.get(0).toString().split("\\");
-                        //String filename = temp[temp.length - 1];
-                        //System.out.println(filename);
-                        try {
-                            if (files.get(0).createNewFile()) {} else {
-                                files.get(0).delete();
-                                files.get(0).createNewFile();
-                            }
-                            try {
-                                FileWriter myWriter = new FileWriter("HelloWorld.java");
-                                myWriter.write(codingArea.getText());
-                                myWriter.close();
-                            } catch (IOException ewe) {
-                                ewe.printStackTrace();
-                            }
-                        } catch (IOException ee) {
-                            ee.printStackTrace();
+                        try{
+                            save(stage);
+                        }
+                        catch(IOException ioe)
+                        {
+                            System.out.println("error");
                         }
                     }
                     if(!writingMode && e.getCode() == KeyCode.C)
                     {
-                        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
-                        //String[] temp = files.get(0).toString().split("\\");
-                        //String filename = temp[temp.length - 1];
-                        //System.out.println(filename);
-                        int result = compiler.run(null, null, null, "-proc:none", files.get(0).toString());
-                        String dir = files.get(0).getParent();
-                        StandardJavaFileManager fileManager = compiler.getStandardFileManager(null, null, null);
-                        CompilationTask task = compiler.getTask(null, fileManager, null, Arrays.asList("-proc:none"), null, fileManager.getJavaFileObjectsFromFiles(files));
-                        if(!task.call())
-                        {System.out.println("F");}
-                        try{fileManager.close();}catch(Exception owo){}
+                        try{
+                            compile(save(stage));
+                        }
+                        catch(Exception eee)
+                        {
+                            System.out.println("error");
+                        }
+                    }
+                    if(!writingMode && e.getCode() == KeyCode.B)
+                    {
+                        load(stage);
                     }
                 }
             });
@@ -234,21 +226,110 @@ public class Window extends Application
     private void updateCursor()
     {
         String[] tokens = codingArea.getText().split("\n");
+        char[] tempText = codingArea.getText().toCharArray();
         int position = codingArea.getCaretPosition();
         int lines = 0;
+        int charSum = -1;
+        int numTabs = 0;
         while(position > tokens[lines].length())
         {
+            charSum += (tokens[lines].length() + 1);
             position -= (tokens[lines++].length() + 1);
             if(lines >= tokens.length)
                 break;
         }
-        cursor.setX(startX + 6.6 * position);
+        for(int i = 1; i <= position; i++)
+            if(tempText[charSum + i] == '\t')
+                numTabs++;
+        cursor.setX(startX + 6.6 * position + 6.6 * 7 * numTabs);
         cursor.setY(startY + 16 * lines);
     }
 
     private void insertNewline()
     {
         codingArea.insertText(codingArea.getCaretPosition(), "\n");
+        toggleMode();
+    }
+
+    private int save(Stage stage) throws IOException
+    {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Save");
+        fileChooser.getExtensionFilters().addAll(new ExtensionFilter("Java", "*.java"));
+        currentFile = fileChooser.showSaveDialog(stage);
+        if(currentFile == null)
+            return -1;
+        filename = currentFile.getName();
+        if (currentFile.createNewFile()) {} 
+        else {
+            currentFile.delete();
+            currentFile.createNewFile();
+        }
+        FileWriter myWriter = new FileWriter(filename);
+        myWriter.write(codingArea.getText());
+        myWriter.close();
+        return 1;
+    }
+
+    private void compile(int response) throws Exception
+    {
+        if(response == -1)
+            return;
+        if(!files.isEmpty())
+        {
+            files.clear();
+            files.add(currentFile);
+        }
+        else
+        {
+            files.add(currentFile);
+        }
+        ByteArrayOutputStream error = new ByteArrayOutputStream();
+        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+        int result = compiler.run(null, null, error, "-proc:none", files.get(0).toString());
+        Message compilationResult = new Message(error.toString());
+        if(result != 0)
+            return;
+        //allow for user input in terminal
+        StandardJavaFileManager fileManager = compiler.getStandardFileManager(null, null, null);
+        CompilationTask task = compiler.getTask(null, fileManager, null, Arrays.asList("-proc:none"), null, fileManager.getJavaFileObjectsFromFiles(files));
+        if(!task.call())
+        {System.out.println("F");}
+        fileManager.close();
+        String noExtension = filename.substring(0,filename.length() - 5);
+        Runtime re = Runtime.getRuntime();
+        String command = "java " + noExtension;
+        Process p = re.exec(command);
+        if(tem == null)
+        {tem = new Terminal();}
+        BufferedReader reader =  
+            new BufferedReader(new InputStreamReader(p.getInputStream()));
+        String line = "";
+        while((line = reader.readLine()) != null) {
+            tem.addText(line + "\n");
+        }
+
+        p.waitFor();
+    }
+
+    public void load(Stage stage)
+    {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Open File");
+        fileChooser.getExtensionFilters().addAll(new ExtensionFilter("Java", "*.java"));
+        currentFile = fileChooser.showOpenDialog(stage);
+        if(currentFile == null)
+            return;
+        Scanner sc = new Scanner(System.in);
+        try{sc = new Scanner(currentFile);}
+        catch(Exception eae){System.out.println("error");}
+        String tempText = "";
+        while(sc.hasNext())
+        {
+            tempText += (sc.nextLine() + "\n");
+        }
+        codingArea.setText(tempText);
+        toggleMode();
         toggleMode();
     }
 }
