@@ -27,6 +27,8 @@ import java.util.Scanner;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.ByteArrayOutputStream;
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 
 public class Window extends Application
 {
@@ -39,8 +41,8 @@ public class Window extends Application
     private ArrayList<File> files = new ArrayList<File>();
     private String filename;
     private File currentFile;
-    private Terminal tem;
     private String scanBuffer;
+    private String directory = "";
 
     public static void main(String []args)
     {
@@ -117,8 +119,8 @@ public class Window extends Application
                     {
                         if(e.isShiftDown())
                         {
-                            up();
                             insertNewline();
+                            up();
                         }
                         else
                         {
@@ -257,6 +259,7 @@ public class Window extends Application
         fileChooser.setTitle("Save");
         fileChooser.getExtensionFilters().addAll(new ExtensionFilter("Java", "*.java"));
         currentFile = fileChooser.showSaveDialog(stage);
+        directory = currentFile.getParent();
         if(currentFile == null)
             return -1;
         filename = currentFile.getName();
@@ -265,7 +268,7 @@ public class Window extends Application
             currentFile.delete();
             currentFile.createNewFile();
         }
-        FileWriter myWriter = new FileWriter(filename);
+        FileWriter myWriter = new FileWriter(currentFile);
         myWriter.write(codingArea.getText());
         myWriter.close();
         return 1;
@@ -284,31 +287,24 @@ public class Window extends Application
         {
             files.add(currentFile);
         }
+        
         ByteArrayOutputStream error = new ByteArrayOutputStream();
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
         int result = compiler.run(null, null, error, "-proc:none", files.get(0).toString());
         Message compilationResult = new Message(error.toString());
         if(result != 0)
             return;
-        //allow for user input in terminal
+            
         StandardJavaFileManager fileManager = compiler.getStandardFileManager(null, null, null);
         CompilationTask task = compiler.getTask(null, fileManager, null, Arrays.asList("-proc:none"), null, fileManager.getJavaFileObjectsFromFiles(files));
         if(!task.call())
         {System.out.println("F");}
         fileManager.close();
+        
         String noExtension = filename.substring(0,filename.length() - 5);
         Runtime re = Runtime.getRuntime();
-        String command = "java " + noExtension;
+        String command = "cmd /c start cmd.exe /K \"cd "+ directory +"&& java " + noExtension +"\"";
         Process p = re.exec(command);
-        if(tem == null)
-        {tem = new Terminal();}
-        BufferedReader reader =  
-            new BufferedReader(new InputStreamReader(p.getInputStream()));
-        String line = "";
-        while((line = reader.readLine()) != null) {
-            tem.addText(line + "\n");
-        }
-
         p.waitFor();
     }
 
