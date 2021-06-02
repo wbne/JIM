@@ -12,13 +12,13 @@ public class Message
 {
     private Label message;
     
-    public Message(String response)
+    public Message(String response, String title)
     {
         Group root = new Group();
         Scene sc = new Scene(root);
         Stage popup = new Stage();
         popup.setScene(sc);
-        popup.setTitle("Compilation Results");
+        popup.setTitle(title);
         popup.setMinHeight(200);
         popup.setMinWidth(300);
         if(response.length() == 0)
@@ -26,8 +26,15 @@ public class Message
         else
             message = new Label(response);
         message.setMinWidth(300);
+        message.setTranslateX(10);
+        message.setTranslateY(10);
         root.getChildren().add(message);
         
         popup.showAndWait();
+    }
+    
+    public Message(String response)
+    {
+        this(response, "Compilation Results");
     }
 }

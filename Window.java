@@ -29,6 +29,7 @@ import java.io.InputStreamReader;
 import java.io.ByteArrayOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.awt.event.*;
 
 public class Window extends Application
 {
@@ -43,7 +44,9 @@ public class Window extends Application
     private File currentFile;
     private String scanBuffer;
     private String directory = "";
-
+    private final String INSTRUCTIONS = "INSTRUCTIONS\ne: edit mode\nijkl: arrow keys\nc: compile\ns: save\nb: open\nh: help\nqq: quit\nesc: exit edit mode";
+    private int quitCount = 0;
+    
     public static void main(String []args)
     {
         launch(args);
@@ -68,8 +71,72 @@ public class Window extends Application
         codingArea.setEditable(writingMode);
         codingArea.setVisible(writingMode);
         codingArea.setFont(defaultFont);
+        codingArea.setPromptText(INSTRUCTIONS);
+        String charTyped = "";
+        codingArea.setOnKeyTyped(event -> {
+                if(event.getCharacter().equals("\r")){
+                    int tabCount = returnTabCount();
+                    for(int i = 0; i < tabCount; i++)
+                        codingArea.insertText(codingArea.getCaretPosition(), "\t");
+                }    
+                codingArea.selectForward();
+                String buffer = codingArea.getSelectedText();
+                codingArea.deselect();
+                if(!buffer.equals(""))
+                    left();
+                if(event.getCharacter().equals("{"))
+                {
+                    codingArea.insertText(codingArea.getCaretPosition(), "}");
+                    left();
+                }
+                if(event.getCharacter().equals("}"))
+                {
+                    if(buffer.equals("}"))
+                        codingArea.deleteNextChar();
+                }
+                if(event.getCharacter().equals("["))
+                {
+                    codingArea.insertText(codingArea.getCaretPosition(), "]");
+                    left();
+                }
+                if(event.getCharacter().equals("]"))
+                {
+                    if(buffer.equals("]"))
+                        codingArea.deleteNextChar();
+                }
+                if(event.getCharacter().equals("("))
+                {
+                    codingArea.insertText(codingArea.getCaretPosition(), ")");
+                    codingArea.backward();
+                }
+                if(event.getCharacter().equals(")"))
+                {
+                    if(buffer.equals(")"))
+                        codingArea.deleteNextChar();
+                }
+                if(event.getCharacter().equals("\""))
+                {
+                    if(buffer.equals("\""))
+                        codingArea.deleteNextChar();
+                    else
+                    {
+                        codingArea.insertText(codingArea.getCaretPosition(), "\"");
+                        left();
+                    }
+                }
+                if(event.getCharacter().equals("\'"))
+                {
+                    if(buffer.equals("\'"))
+                        codingArea.deleteNextChar();
+                    else
+                    {
+                        codingArea.insertText(codingArea.getCaretPosition(), "\'");
+                        left();
+                    }
+                }
+            });
 
-        clonedText = new Label("");
+        clonedText = new Label(INSTRUCTIONS);
         clonedText.setMinWidth(800);
         root.getChildren().add(clonedText);
         clonedText.setTranslateX(8);
@@ -93,20 +160,20 @@ public class Window extends Application
                     {
                         toggleMode();
                     }
-                    if(!writingMode && e.getCode() == KeyCode.I)
+                    if(!writingMode && e.getCode() == KeyCode.E)
                     {
                         toggleMode();
                     }
 
-                    if(!writingMode && e.getCode() == KeyCode.H)
+                    if(!writingMode && e.getCode() == KeyCode.J)
                     {
                         left();
                     }
-                    if(!writingMode && e.getCode() == KeyCode.J)
+                    if(!writingMode && e.getCode() == KeyCode.K)
                     {
                         down();
                     }
-                    if(!writingMode && e.getCode() == KeyCode.K)
+                    if(!writingMode && e.getCode() == KeyCode.I)
                     {
                         up();
                     }
@@ -151,6 +218,18 @@ public class Window extends Application
                     {
                         load(stage);
                     }
+                    if(!writingMode && e.getCode() == KeyCode.H)
+                    {
+                        help();
+                    }
+                    if(!writingMode && e.getCode() == KeyCode.Q)
+                    {
+                        quit(stage);
+                    }
+                    else if(quitCount != 0)
+                    {
+                        quitCount = 0;
+                    }
                 }
             });
 
@@ -161,7 +240,8 @@ public class Window extends Application
     {
         writingMode = !writingMode;
         codingArea.setEditable(writingMode);
-        clonedText.setText(codingArea.getText());
+        String text = codingArea.getText();
+        clonedText.setText(text);
         codingArea.setVisible(writingMode);
         clonedText.setVisible(!writingMode);
         cursor.setVisible(!writingMode);
@@ -249,7 +329,11 @@ public class Window extends Application
 
     private void insertNewline()
     {
+        int tabCount = returnTabCount();
         codingArea.insertText(codingArea.getCaretPosition(), "\n");
+        for(int i = 0; i < tabCount; i++)
+            codingArea.insertText(codingArea.getCaretPosition(), "\t");
+
         toggleMode();
     }
 
@@ -287,20 +371,20 @@ public class Window extends Application
         {
             files.add(currentFile);
         }
-        
+
         ByteArrayOutputStream error = new ByteArrayOutputStream();
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
         int result = compiler.run(null, null, error, "-proc:none", files.get(0).toString());
         Message compilationResult = new Message(error.toString());
         if(result != 0)
             return;
-            
+
         StandardJavaFileManager fileManager = compiler.getStandardFileManager(null, null, null);
         CompilationTask task = compiler.getTask(null, fileManager, null, Arrays.asList("-proc:none"), null, fileManager.getJavaFileObjectsFromFiles(files));
         if(!task.call())
         {System.out.println("F");}
         fileManager.close();
-        
+
         String noExtension = filename.substring(0,filename.length() - 5);
         Runtime re = Runtime.getRuntime();
         String command = "cmd /c start cmd.exe /K \"cd "+ directory +"&& java " + noExtension +"\"";
@@ -308,7 +392,7 @@ public class Window extends Application
         p.waitFor();
     }
 
-    public void load(Stage stage)
+    private void load(Stage stage)
     {
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("Open File");
@@ -327,5 +411,38 @@ public class Window extends Application
         codingArea.setText(tempText);
         toggleMode();
         toggleMode();
+    }
+
+    private int returnTabCount()
+    {
+        int tabCount = 0;
+        int lineCount = 1;
+        int position = codingArea.getCaretPosition();
+        char[] tempText = codingArea.getText().substring(0, position).toCharArray();
+        for(char c : tempText)
+            if(c == '\n')
+                lineCount++;
+        //System.out.println("line count:"+lineCount + " position: " + position);
+        for(int i = position - lineCount; i > 0; i--)
+        {
+            char c = tempText[i];
+            if(c == '\t')
+                tabCount++;
+            if(c == '\n')
+                break;
+        }
+        return tabCount;
+    }
+    
+    private void help()
+    {
+        new Message(INSTRUCTIONS, "Help");
+    }
+    
+    private void quit(Stage stage)
+    {
+        quitCount++;
+        if(quitCount == 2)
+            try{stage.close();}catch(Exception e){}
     }
 }
